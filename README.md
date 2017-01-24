@@ -7,10 +7,10 @@ The values can be:
 
 * Resource value: *my_channel.my_resource*
 * Nested resource value: *my_channel.my_resource.nested_element.nested_element2*
-* Primary value
+* Primitive value
     * boolean
     * number
-    * text
+    * string
 
 ## Expressions Grammar
 
