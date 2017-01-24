@@ -1,0 +1,26 @@
+{
+  "name": "bbt-expr",
+  "description": "Beebotte expression processor",
+  "version": "0.1.0",
+  "author": "Bachar Wehbi <me@bachwehbi.net>",
+  "homepage": "https://github.com/beebotte/bbt-expr",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/beebotte/bbt-expr.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "parse": "pegjs -o ./lib/parser.js ./dsl/bbtexpr_dsl.peg",
+    "build": "browserify ./index.js --s bbtexpr | uglifyjs -m -o dist/bbtexpr.js"
+  },
+  "dependencies": {
+    "async": "2.1.4",
+    "moment": "2.17.1"
+  },
+  "devDependencies": {
+    "browserify": "13.3.0",
+    "pegjs": "0.10.0",
+    "uglify-js": "2.7.5"
+  },
+  "license": "MIT"
+}

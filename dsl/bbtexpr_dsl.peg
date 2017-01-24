@@ -1,0 +1,376 @@
+{
+  var bbtcondition = require('./condition.js');
+  var types = require('./types.js');
+  var moment = require('moment');
+}
+
+start =
+  c_condition:complex_condition { return c_condition; }
+  / additive:additive {return additive;}
+
+complex_condition =
+  condition:condition or:(OR ws orcondition:condition {return orcondition;})? {
+    if (or) {
+      return bbtcondition.createExpressionOrValue({
+        left: condition,
+        right: or,
+        oper: types.OPERATORS.BBT_OR
+      })
+    } else {
+      return condition;
+    }
+  }
+
+condition =
+  atom:atom and:(AND ws andatom:atom {return andatom})? {
+    if (and) {
+      return bbtcondition.createExpressionOrValue({
+        left: atom,
+        right: and,
+        oper: types.OPERATORS.BBT_AND
+      })
+    } else {
+      return atom
+    }
+  }
+
+negation =
+  NOT ws atom:atom {
+    return bbtcondition.createExpressionOrValue({
+      left: atom,
+      oper: types.OPERATORS.BBT_NOT
+    })
+  }
+
+atom =
+  comparison:comparison ws {
+    return comparison;
+  }
+  / neg:negation ws {
+    return neg;
+  }
+  / '(' ws complex:complex_condition ws ')' {
+    return complex;
+  }
+
+comparison =
+  eq:eq {return eq;}
+  / neq:neq {return neq;}
+  / gt:gt {return gt;}
+  / gte:gte {return gte;}
+  / lt:lt {return lt;}
+  / lte:lte {return lte;}
+
+eq =
+  left:additive ws "==" ws right:additive {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_EQ
+    });
+  }
+
+neq =
+  left:additive ws "!=" ws right:additive {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_NEQ
+    })
+  }
+
+gt =
+  left:additive ws ">" ws right:additive {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_GT
+    })
+  }
+
+gte =
+  left:additive ws ">=" ws right:additive {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_GTE
+    })
+  }
+
+lt =
+  left:additive ws "<" ws right:additive {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_LT
+    })
+  }
+
+lte =
+  left:additive ws "<=" ws right:additive {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_LTE
+    })
+  }
+
+additive
+  = left:multiplicative  ws PLUS  ws right:additive {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_ADD
+    })
+  }
+  / left:multiplicative  ws MINUS  ws right:additive {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_SUB
+    })
+  }
+  / multiplicative
+
+multiplicative
+  = left:value  ws MULT  ws right:multiplicative {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_MULT
+    })
+  }
+  / left:value  ws DIV  ws right:multiplicative {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_DIV
+    })
+  }
+  / left:value  ws IDIV  ws right:multiplicative {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_IDIV
+    })
+  }
+  / left:value  ws MOD  ws right:multiplicative {
+    return bbtcondition.createExpressionOrValue({
+      left: left,
+      right: right,
+      oper: types.OPERATORS.BBT_MOD
+    })
+  }
+  / fct:fct {
+    return new bbtcondition.FunctionValue(fct)
+  }
+  / nested_value
+
+nested_value =
+  fct:fct_chain keys:keys?
+    {
+      if (fct.keys) {
+        fct.keys.concat(keys);
+      } else {
+        fct.keys = keys
+      }
+
+      return fct;
+    }
+
+  / value:value keys:keys?
+    {
+      if (value.keys) {
+        value.keys.concat(keys)
+      } else {
+        value.keys = keys;
+      }
+
+      return value;
+    }
+
+value =
+  primitive:primitive {
+    return new bbtcondition.Value({
+      val: primitive
+    })
+  }
+  / constructor
+  / resource:resource
+  {
+    return new bbtcondition.ResourceValue(resource);
+  }
+  / OPEN_PARENTHESE  ws additive:additive  ws CLOSE_PARENTHESE {
+    return additive
+  }
+
+resource = channel:STNAME "." resource:STNAME {
+  return {
+    channel: channel,
+    resource: resource
+    }
+  }
+
+operation = keys
+
+keys =
+  key+
+
+key =
+  "." elem:STNAME {return elem;}
+
+fct_chain =
+  fct:fct chain:(operation:operation '(' params:parameters ')' {
+    return {
+      operation: oparation,
+      params: params
+    }
+  })*
+    {
+      //TODO: process function chaining
+      return fct;
+    }
+
+fct =
+  value:value operation:operation '(' params:parameters ')'
+    {
+      return {
+        fct: function() {
+          var self = this
+          return self[operation].apply(self, arguments)
+        },
+        params: params,
+        that: value
+      };
+    }
+
+  / prot:prototype operation:operation '(' params:parameters ')'
+    {
+      if (typeof prot.prototype[operation] !== 'function') {
+        throw prot.name + ' has no method ' + operation;
+      }
+      return {
+        fct: prot.prototype[operation],
+        params: params
+      };
+    }
+
+parameters =
+  param:parameter params:(',' parameter:parameter {return parameter;})+ {
+    params.unshift(param);
+    return params
+  }
+  / param:parameter {
+    return [param];
+  }
+
+parameter =
+  ws param:nested_value ws {return param;}
+
+prototype =
+  STRING {return String;}
+  / DATE {return moment;}
+
+constructor =
+  date_constructor
+
+date_constructor =
+  DATE "(" params:parameters ")"
+    {
+      return new bbtcondition.FunctionValue({
+        fct: function() {
+          var bound = moment.bind();
+          var retval = bound.apply(undefined, arguments)
+          console.log(retval.format())
+          return retval
+        },
+        params: params
+      });
+    }
+
+primitive =
+  str:string {return str;}
+  / nb:number {return nb;}
+  / b:bool {return b;}
+
+bool =
+  "true" {return true;}
+  / "false" {return false;}
+
+OR = ['O','o']['R','r']
+AND = ['A','a']['N','n']['D','d']
+NOT = ['N','n']['O','o']['T','t']
+  / '!'
+
+PLUS = '+'
+MINUS = '-'
+MULT = '*'
+IDIV = 'idiv'
+DIV = '/'
+MOD = '%'
+OPEN_PARENTHESE = '('
+CLOSE_PARENTHESE = ')'
+
+STRING = "String"
+DATE = "Date"
+
+STNAME = char:[a-zA-Z_] chars:[0-9a-zA-Z_]* { return char + chars.join(""); }
+
+string "string" =
+  '"' chars:chars '"' { return chars; }
+  / STRING OPEN_PARENTHESE value:primitive CLOSE_PARENTHESE
+    {
+      return String(value)
+    }
+
+chars
+  = chars:char+ { return chars.join(""); }
+
+char
+  // In the original JSON grammar:
+  // "any-Unicode-character-except-"-or-\-or-control-character"
+  = [^"\\\0-\x1F\x7f]
+  / '\\"'  { return '"';  }
+  / "\\\\" { return "\\"; }
+  / "\\/"  { return "/";  }
+  / "\\b"  { return "\b"; }
+  / "\\f"  { return "\f"; }
+  / "\\n"  { return "\n"; }
+  / "\\r"  { return "\r"; }
+  / "\\t"  { return "\t"; }
+  / "\\u" digits:$(hexDigit hexDigit hexDigit hexDigit) {
+      return String.fromCharCode(parseInt(digits, 16));
+    }
+
+hexDigit
+  = [0-9a-fA-F]
+
+number =
+  sign:(MINUS {return true})? nb:int fraction:('.' dec:int {return dec})?
+  {
+    var value = parseFloat(nb + '.' + fraction);
+    if(sign) return -value;
+    return value;
+  }
+
+int
+  = nb:digit+ {return parseInt(nb.join(""));}
+
+digit
+  = [0-9]
+
+/* ===== Whitespace ===== */
+
+nl = newline*
+newline = [\r\n]
+
+ws "space" = space*
+space = [ \t]
+
+_ "whitespace"
+  = whitespace*
+
+// Whitespace is undefined in the original JSON grammar, so I assume a simple
+// conventional definition consistent with ECMA-262, 5th ed.
+whitespace
+  = [ \t\r\n]
