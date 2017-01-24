@@ -11,7 +11,8 @@
   "main": "index.js",
   "scripts": {
     "parse": "pegjs -o ./lib/parser.js ./dsl/bbtexpr_dsl.peg",
-    "build": "browserify ./index.js --s bbtexpr | uglifyjs -m -o dist/bbtexpr.js"
+    "build": "browserify ./index.js --s bbtexpr -o dist/bbtexpr.js",
+    "buildmin": "uglifyjs ./dist/bbtexpr.js -m --ascii -o dist/bbtexpr.min.js"
   },
   "dependencies": {
     "async": "2.1.4",
