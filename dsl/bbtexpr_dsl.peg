@@ -2,6 +2,8 @@
   var bbtcondition = require('./condition.js');
   var types = require('./types.js');
   var moment = require('moment');
+  var Geolib = require('geolib');
+  var mathjs = require('mathjs');
 }
 
 start =
@@ -195,7 +197,7 @@ value =
       val: primitive
     })
   }
-  / constructor
+  / constructor:constructor {return constructor;}
   / resource:resource
   {
     return new bbtcondition.ResourceValue(resource);
@@ -211,7 +213,7 @@ resource = channel:STNAME "." resource:STNAME {
     }
   }
 
-operation = keys
+operation = key
 
 keys =
   key+
@@ -220,7 +222,7 @@ key =
   "." elem:STNAME {return elem;}
 
 fct_chain =
-  fct:fct chain:(operation:operation '(' params:parameters ')' {
+  fct:fct chain:(operation:operation '(' params:parameters? ')' {
     return {
       operation: oparation,
       params: params
@@ -232,7 +234,7 @@ fct_chain =
     }
 
 fct =
-  value:value operation:operation '(' params:parameters ')'
+  value:value operation:operation '(' params:parameters? ')'
     {
       return {
         fct: function() {
@@ -244,13 +246,13 @@ fct =
       };
     }
 
-  / prot:prototype operation:operation '(' params:parameters ')'
+  / prot:prototype operation:operation '(' params:parameters? ')'
     {
-      if (typeof prot.prototype[operation] !== 'function') {
+      if (typeof prot[operation] !== 'function') {
         throw prot.name + ' has no method ' + operation;
       }
       return {
-        fct: prot.prototype[operation],
+        fct: prot[operation],
         params: params
       };
     }
@@ -264,18 +266,23 @@ parameters =
     return [param];
   }
 
+
 parameter =
   ws param:nested_value ws {return param;}
 
 prototype =
-  STRING {return String;}
-  / DATE {return moment;}
+  STRING {return String.prototype;}
+  / DATE {return moment.prototype;}
+  / GEOLIB {return Geolib.prototype;}
+  / MATH {return mathjs;}
 
 constructor =
-  date_constructor
+  dateconstructor:date_constructor {return dateconstructor;}
+  / gps:geopoint {return gps;}
+  / poly:polygone {return poly;}
 
 date_constructor =
-  DATE "(" params:parameters ")"
+  DATE "(" params:parameters? ")"
     {
       return new bbtcondition.FunctionValue({
         fct: function() {
@@ -285,6 +292,46 @@ date_constructor =
           return retval
         },
         params: params
+      });
+    }
+
+geopoint =
+  ws GEOPOINT OPEN_PARENTHESE lat:parameter ws ',' ws lng:parameter CLOSE_PARENTHESE
+    {
+      return new bbtcondition.FunctionValue({
+        fct: function(latitude, longitude) {
+          return {latitude: latitude, longitude: longitude}
+        },
+        params: [lat, lng]
+      });
+      return
+    }
+  / ws GEOPOINT OPEN_PARENTHESE parameter:parameter ws CLOSE_PARENTHESE
+    {
+      return new bbtcondition.FunctionValue({
+        fct: function(param) {
+          // we are expecting param to contain latitude and longitude
+          if (!param.hasOwnProperty('latitude') || param.hasOwnProperty('longitude')) {
+            throw new Error('Expecting param to have latitude and longitude parameters')
+          }
+
+          return {latitude: param.latitude, longitude: param.longitude}
+        },
+        params: [parameter]
+      });
+      return
+    }
+
+
+polygone =
+  ws POLYGONE OPEN_PARENTHESE p1:geopoint ',' p2:geopoint points:(',' point:geopoint {return point;})+ CLOSE_PARENTHESE
+    {
+      points.unshift(p1, p2)
+      return new bbtcondition.FunctionValue({
+        fct: function(pts) {
+          return Array.prototype.slice.call(arguments);
+        },
+        params: points
       });
     }
 
@@ -313,6 +360,10 @@ CLOSE_PARENTHESE = ')'
 
 STRING = "String"
 DATE = "Date"
+GEOLIB = "Geolib"
+GEOPOINT = "Geopoint"
+POLYGONE = "Polygone"
+MATH = "Math"
 
 STNAME = char:[a-zA-Z_] chars:[0-9a-zA-Z_]* { return char + chars.join(""); }
 
