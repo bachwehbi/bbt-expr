@@ -5,7 +5,7 @@
 * Function operation should be divided into keys and operation
 * Function chaining
 * Constructors
-* String operations
+* String operations (DONE)
   * length
   * startWith
   * endWith
