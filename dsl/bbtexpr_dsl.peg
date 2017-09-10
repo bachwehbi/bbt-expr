@@ -198,10 +198,12 @@ value =
     })
   }
   / constructor:constructor {return constructor;}
+  / trigger:trigger {return new bbtcondition.TriggerValue()}
   / resource:resource
   {
     return new bbtcondition.ResourceValue(resource);
   }
+
   / OPEN_PARENTHESE  ws additive:additive  ws CLOSE_PARENTHESE {
     return additive
   }
@@ -212,6 +214,8 @@ resource = channel:STNAME "." resource:STNAME {
     resource: resource
     }
   }
+
+trigger = TRIGGER
 
 operation = key
 
@@ -364,6 +368,7 @@ GEOLIB = "Geolib"
 GEOPOINT = "Geopoint"
 POLYGONE = "Polygone"
 MATH = "Math"
+TRIGGER = ['t', 'T']['r', 'R']['i', 'I']['g', 'G']['g', 'G']['e', 'E']['r', 'R']
 
 STNAME = char:[a-zA-Z_] chars:[0-9a-zA-Z_]* { return char + chars.join(""); }
 
