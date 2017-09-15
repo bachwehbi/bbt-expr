@@ -135,33 +135,46 @@ additive
   / multiplicative
 
 multiplicative
-  = left:value  ws MULT  ws right:multiplicative {
+  = left:generic_value  ws MULT  ws right:multiplicative {
     return bbtcondition.createExpressionOrValue({
       left: left,
       right: right,
       oper: types.OPERATORS.BBT_MULT
     })
   }
-  / left:value  ws DIV  ws right:multiplicative {
+  / left:generic_value  ws DIV  ws right:multiplicative {
     return bbtcondition.createExpressionOrValue({
       left: left,
       right: right,
       oper: types.OPERATORS.BBT_DIV
     })
   }
-  / left:value  ws IDIV  ws right:multiplicative {
+  / left:generic_value  ws IDIV  ws right:multiplicative {
     return bbtcondition.createExpressionOrValue({
       left: left,
       right: right,
       oper: types.OPERATORS.BBT_IDIV
     })
   }
-  / left:value  ws MOD  ws right:multiplicative {
+  / left:generic_value  ws MOD  ws right:multiplicative {
     return bbtcondition.createExpressionOrValue({
       left: left,
       right: right,
       oper: types.OPERATORS.BBT_MOD
     })
+  }
+  / generic_value
+
+generic_value =
+  fct:fct keys:keys+ {
+
+    if (fct.keys) {
+      fct.keys.concat(keys)
+    } else {
+      fct.keys = keys;
+    }
+
+    return new bbtcondition.FunctionValue(fct)
   }
   / fct:fct {
     return new bbtcondition.FunctionValue(fct)
@@ -169,18 +182,7 @@ multiplicative
   / nested_value
 
 nested_value =
-  fct:fct_chain keys:keys?
-    {
-      if (fct.keys) {
-        fct.keys.concat(keys);
-      } else {
-        fct.keys = keys
-      }
-
-      return fct;
-    }
-
-  / value:value keys:keys?
+  value:value keys:keys?
     {
       if (value.keys) {
         value.keys.concat(keys)
@@ -190,40 +192,6 @@ nested_value =
 
       return value;
     }
-
-value =
-  primitive:primitive {
-    return new bbtcondition.Value({
-      val: primitive
-    })
-  }
-  / constructor:constructor {return constructor;}
-  / trigger:trigger {return new bbtcondition.TriggerValue()}
-  / resource:resource
-  {
-    return new bbtcondition.ResourceValue(resource);
-  }
-
-  / OPEN_PARENTHESE  ws additive:additive  ws CLOSE_PARENTHESE {
-    return additive
-  }
-
-resource = channel:STNAME "." resource:STNAME {
-  return {
-    channel: channel,
-    resource: resource
-    }
-  }
-
-trigger = TRIGGER
-
-operation = key
-
-keys =
-  key+
-
-key =
-  "." elem:STNAME {return elem;}
 
 fct_chain =
   fct:fct chain:(operation:operation '(' params:parameters? ')' {
@@ -238,8 +206,16 @@ fct_chain =
     }
 
 fct =
-  value:value operation:operation '(' params:parameters? ')'
+  value:value keys:keys+ '(' params:parameters? ')'
     {
+      var operation = keys.pop()
+
+      if (value.keys) {
+        value.keys.concat(keys)
+      } else {
+        value.keys = keys;
+      }
+
       return {
         fct: function() {
           var self = this
@@ -260,6 +236,40 @@ fct =
         params: params
       };
     }
+
+value =
+  OPEN_PARENTHESE  ws additive:additive  ws CLOSE_PARENTHESE {
+    return additive
+  }
+  / primitive:primitive {
+    return new bbtcondition.Value({
+      val: primitive
+    })
+  }
+  / constructor:constructor {return constructor;}
+  / trigger:trigger {return new bbtcondition.TriggerValue()}
+  / resource:resource
+  {
+    return new bbtcondition.ResourceValue(resource);
+  }
+
+
+resource = channel:STNAME "." resource:STNAME {
+  return {
+    channel: channel,
+    resource: resource
+    }
+  }
+
+trigger = TRIGGER
+
+operation = key
+
+keys =
+  key+
+
+key =
+  "." elem:STNAME {return elem;}
 
 parameters =
   param:parameter params:(',' parameter:parameter {return parameter;})+ {
