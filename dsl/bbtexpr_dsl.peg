@@ -1,166 +1,98 @@
 {
-  var bbtcondition = require('./condition.js');
+  var bbtCondition = require('./condition.js');
   var types = require('./types.js');
   var moment = require('moment');
   var Geolib = require('geolib');
   var mathjs = require('mathjs');
 }
 
-start =
-  c_condition:complex_condition { return c_condition; }
-  / additive:additive {return additive;}
+start
+  = c_condition:OrExpression { return c_condition; }
+  / Additive:Additive {return Additive;}
 
-complex_condition =
-  condition:condition or:(OR ws orcondition:condition {return orcondition;})? {
-    if (or) {
-      return bbtcondition.createExpressionOrValue({
-        left: condition,
-        right: or,
+OrExpression
+  = left:AndExpression right:(OR ws exp:OrExpression {return exp;})? {
+    if (right) {
+      return bbtCondition.createExpressionOrValue({
+        left: left,
+        right: right,
         oper: types.OPERATORS.BBT_OR
       })
     } else {
-      return condition;
+      return left;
     }
   }
 
-condition =
-  atom:atom and:(AND ws andatom:atom {return andatom})? {
-    if (and) {
-      return bbtcondition.createExpressionOrValue({
-        left: atom,
-        right: and,
+AndExpression
+  = left:atom right:(AND ws exp:AndExpression {return exp})? {
+    if (right) {
+      return bbtCondition.createExpressionOrValue({
+        left: left,
+        right: right,
         oper: types.OPERATORS.BBT_AND
       })
     } else {
-      return atom
+      return left
     }
   }
 
-negation =
-  NOT ws atom:atom {
-    return bbtcondition.createExpressionOrValue({
+atom
+  = ws '(' ws exp:OrExpression ws ')' ws {
+    return exp;
+  }
+  / NOT ws atom:atom {
+    return bbtCondition.createExpressionOrValue({
       left: atom,
       oper: types.OPERATORS.BBT_NOT
     })
   }
-
-atom =
-  comparison:comparison ws {
-    return comparison;
-  }
-  / neg:negation ws {
-    return neg;
-  }
-  / '(' ws complex:complex_condition ws ')' {
-    return complex;
+  / Comparison:Comparison ws {
+    return Comparison;
   }
 
-comparison =
-  eq:eq {return eq;}
-  / neq:neq {return neq;}
-  / gt:gt {return gt;}
-  / gte:gte {return gte;}
-  / lt:lt {return lt;}
-  / lte:lte {return lte;}
+ComparisonOperator
+  = "==" {return types.OPERATORS.BBT_EQ}
+  / "!=" {return types.OPERATORS.BBT_NEQ}
+  / ">" {return types.OPERATORS.BBT_GT}
+  / ">=" {return types.OPERATORS.BBT_GTE}
+  / "<" {return types.OPERATORS.BBT_LT}
+  / "<=" {return types.OPERATORS.BBT_LTQ}
 
-eq =
-  left:additive ws "==" ws right:additive {
-    return bbtcondition.createExpressionOrValue({
+Comparison
+  = left:Additive ws oper:ComparisonOperator ws right:Additive {
+    return bbtCondition.createExpressionOrValue({
       left: left,
       right: right,
-      oper: types.OPERATORS.BBT_EQ
-    });
-  }
-
-neq =
-  left:additive ws "!=" ws right:additive {
-    return bbtcondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: types.OPERATORS.BBT_NEQ
+      oper: oper
     })
   }
 
-gt =
-  left:additive ws ">" ws right:additive {
-    return bbtcondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: types.OPERATORS.BBT_GT
-    })
-  }
+AdditiveOperator
+  = "+" {return types.OPERATORS.BBT_ADD}
+  / "-" {return types.OPERATORS.BBT_SUB}
 
-gte =
-  left:additive ws ">=" ws right:additive {
-    return bbtcondition.createExpressionOrValue({
+Additive
+  = left:Multiplicative  ws oper:AdditiveOperator  ws right:Additive {
+    return bbtCondition.createExpressionOrValue({
       left: left,
       right: right,
-      oper: types.OPERATORS.BBT_GTE
+      oper: oper
     })
   }
+  / Multiplicative
 
-lt =
-  left:additive ws "<" ws right:additive {
-    return bbtcondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: types.OPERATORS.BBT_LT
-    })
-  }
+MultiplicativeOperator
+  = "*" { return types.OPERATORS.BBT_MULT }
+  / "/" { return types.OPERATORS.BBT_DIV }
+  / "idiv" { return types.OPERATORS.BBT_IDIV }
+  / "%" { return types.OPERATORS.BBT_MOD }
 
-lte =
-  left:additive ws "<=" ws right:additive {
-    return bbtcondition.createExpressionOrValue({
+Multiplicative
+  = left:generic_value  ws oper:MultiplicativeOperator  ws right:Multiplicative {
+    return bbtCondition.createExpressionOrValue({
       left: left,
       right: right,
-      oper: types.OPERATORS.BBT_LTE
-    })
-  }
-
-additive
-  = left:multiplicative  ws PLUS  ws right:additive {
-    return bbtcondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: types.OPERATORS.BBT_ADD
-    })
-  }
-  / left:multiplicative  ws MINUS  ws right:additive {
-    return bbtcondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: types.OPERATORS.BBT_SUB
-    })
-  }
-  / multiplicative
-
-multiplicative
-  = left:generic_value  ws MULT  ws right:multiplicative {
-    return bbtcondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: types.OPERATORS.BBT_MULT
-    })
-  }
-  / left:generic_value  ws DIV  ws right:multiplicative {
-    return bbtcondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: types.OPERATORS.BBT_DIV
-    })
-  }
-  / left:generic_value  ws IDIV  ws right:multiplicative {
-    return bbtcondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: types.OPERATORS.BBT_IDIV
-    })
-  }
-  / left:generic_value  ws MOD  ws right:multiplicative {
-    return bbtcondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: types.OPERATORS.BBT_MOD
+      oper: oper
     })
   }
   / generic_value
@@ -174,39 +106,26 @@ generic_value =
       fct.keys = keys;
     }
 
-    return new bbtcondition.FunctionValue(fct)
+    return new bbtCondition.FunctionValue(fct)
   }
   / fct:fct {
-    return new bbtcondition.FunctionValue(fct)
+    return new bbtCondition.FunctionValue(fct)
   }
-  / nested_value
+  / NestedValue
 
-nested_value =
-  value:value keys:keys?
-    {
-      if (value.keys) {
-        value.keys.concat(keys)
-      } else {
-        value.keys = keys;
-      }
-
-      return value;
+NestedValue
+  = value:value keys:keys? {
+    if (value.keys) {
+      value.keys.concat(keys)
+    } else {
+      value.keys = keys;
     }
 
-fct_chain =
-  fct:fct chain:(operation:operation '(' params:parameters? ')' {
-    return {
-      operation: oparation,
-      params: params
-    }
-  })*
-    {
-      //TODO: process function chaining
-      return fct;
-    }
+    return value;
+  }
 
 fct =
-  value:value keys:keys+ '(' params:parameters? ')'
+  value:value keys:keys+ '(' params:ParameterList? ')'
     {
       var operation = keys.pop()
 
@@ -226,7 +145,7 @@ fct =
       };
     }
 
-  / prot:prototype operation:operation '(' params:parameters? ')'
+  / prot:prototype operation:operation '(' params:ParameterList? ')'
     {
       if (typeof prot[operation] !== 'function') {
         throw prot.name + ' has no method ' + operation;
@@ -238,19 +157,19 @@ fct =
     }
 
 value =
-  OPEN_PARENTHESE  ws additive:additive  ws CLOSE_PARENTHESE {
-    return additive
+  OPEN_PARENTHESE  ws Additive:Additive ws CLOSE_PARENTHESE {
+    return Additive
   }
   / primitive:primitive {
-    return new bbtcondition.Value({
+    return new bbtCondition.Value({
       val: primitive
     })
   }
   / constructor:constructor {return constructor;}
-  / trigger:trigger {return new bbtcondition.TriggerValue()}
+  / trigger:trigger {return new bbtCondition.TriggerValue()}
   / resource:resource
   {
-    return new bbtcondition.ResourceValue(resource);
+    return new bbtCondition.ResourceValue(resource);
   }
 
 
@@ -271,18 +190,19 @@ keys =
 key =
   "." elem:STNAME {return elem;}
 
-parameters =
-  param:parameter params:(',' parameter:parameter {return parameter;})+ {
-    params.unshift(param);
-    return params
-  }
-  / param:parameter {
-    return [param];
+ParameterList
+  = param:Parameter params:(',' parameter:Parameter {return parameter;})* {
+    if (params.length) {
+      params.unshift(param);
+      return params
+    } else {
+      return [param];
+    }
   }
 
 
-parameter =
-  ws param:nested_value ws {return param;}
+Parameter =
+  ws param:Additive ws {return param;}
 
 prototype =
   STRING {return String.prototype;}
@@ -296,9 +216,9 @@ constructor =
   / poly:polygone {return poly;}
 
 date_constructor =
-  DATE "(" params:parameters? ")"
+  DATE "(" params:ParameterList? ")"
     {
-      return new bbtcondition.FunctionValue({
+      return new bbtCondition.FunctionValue({
         fct: function() {
           var bound = moment.bind();
           var retval = bound.apply(undefined, arguments)
@@ -310,9 +230,9 @@ date_constructor =
     }
 
 geopoint =
-  ws GEOPOINT OPEN_PARENTHESE lat:parameter ws ',' ws lng:parameter CLOSE_PARENTHESE
+  ws GEOPOINT OPEN_PARENTHESE lat:Parameter ws ',' ws lng:Parameter CLOSE_PARENTHESE
     {
-      return new bbtcondition.FunctionValue({
+      return new bbtCondition.FunctionValue({
         fct: function(latitude, longitude) {
           return {latitude: latitude, longitude: longitude}
         },
@@ -320,9 +240,9 @@ geopoint =
       });
       return
     }
-  / ws GEOPOINT OPEN_PARENTHESE parameter:parameter ws CLOSE_PARENTHESE
+  / ws GEOPOINT OPEN_PARENTHESE parameter:Parameter ws CLOSE_PARENTHESE
     {
-      return new bbtcondition.FunctionValue({
+      return new bbtCondition.FunctionValue({
         fct: function(param) {
           // we are expecting param to contain latitude and longitude
           if (!param.hasOwnProperty('latitude') || param.hasOwnProperty('longitude')) {
@@ -337,38 +257,38 @@ geopoint =
     }
 
 
-polygone =
-  ws POLYGONE OPEN_PARENTHESE p1:geopoint ',' p2:geopoint points:(',' point:geopoint {return point;})+ CLOSE_PARENTHESE
-    {
-      points.unshift(p1, p2)
-      return new bbtcondition.FunctionValue({
-        fct: function(pts) {
-          return Array.prototype.slice.call(arguments);
-        },
-        params: points
-      });
-    }
+polygone
+  = ws POLYGONE OPEN_PARENTHESE p1:geopoint ',' p2:geopoint points:(',' point:geopoint {return point;})+ CLOSE_PARENTHESE {
+    points.unshift(p1, p2)
+    return new bbtCondition.FunctionValue({
+      fct: function(pts) {
+        return Array.prototype.slice.call(arguments);
+      },
+      params: points
+    });
+  }
 
-primitive =
-  str:string {return str;}
+primitive
+  = str:string {return str;}
   / nb:number {return nb;}
   / b:bool {return b;}
 
-bool =
-  "true" {return true;}
+bool
+  = "true" {return true;}
   / "false" {return false;}
 
-OR = ['O','o']['R','r']
-AND = ['A','a']['N','n']['D','d']
-NOT = ['N','n']['O','o']['T','t']
+OR
+  = "OR"i /* case insensitive */
+  / "||"
+
+AND
+  = "AND"i /* case insensitive */
+  / "&&"
+
+NOT
+  = "NOT" /* case insensitive */
   / '!'
 
-PLUS = '+'
-MINUS = '-'
-MULT = '*'
-IDIV = 'idiv'
-DIV = '/'
-MOD = '%'
 OPEN_PARENTHESE = '('
 CLOSE_PARENTHESE = ')'
 
@@ -378,7 +298,7 @@ GEOLIB = "Geolib"
 GEOPOINT = "Geopoint"
 POLYGONE = "Polygone"
 MATH = "Math"
-TRIGGER = ['t', 'T']['r', 'R']['i', 'I']['g', 'G']['g', 'G']['e', 'E']['r', 'R']
+TRIGGER = "trigger"i
 
 STNAME = char:[a-zA-Z_] chars:[0-9a-zA-Z_]* { return char + chars.join(""); }
 
@@ -411,9 +331,8 @@ char
 hexDigit
   = [0-9a-fA-F]
 
-number =
-  sign:(MINUS {return true})? nb:int fraction:('.' dec:int {return dec})?
-  {
+number
+  = sign:("-" {return true})? nb:int fraction:('.' dec:int {return dec})? {
     var value = parseFloat(nb + '.' + fraction);
     if(sign) return -value;
     return value;
