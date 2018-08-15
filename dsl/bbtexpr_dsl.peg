@@ -88,28 +88,12 @@ MultiplicativeOperator
   / "%" { return types.OPERATORS.BBT_MOD }
 
 Multiplicative
-  = left:generic_value  ws oper:MultiplicativeOperator  ws right:Multiplicative {
+  = left:NestedValue  ws oper:MultiplicativeOperator  ws right:Multiplicative {
     return bbtCondition.createExpressionOrValue({
       left: left,
       right: right,
       oper: oper
     })
-  }
-  / generic_value
-
-generic_value =
-  fct:fct keys:keys+ {
-
-    if (fct.keys) {
-      fct.keys.concat(keys)
-    } else {
-      fct.keys = keys;
-    }
-
-    return new bbtCondition.FunctionValue(fct)
-  }
-  / fct:fct {
-    return new bbtCondition.FunctionValue(fct)
   }
   / NestedValue
 
@@ -123,38 +107,6 @@ NestedValue
 
     return value;
   }
-
-fct =
-  value:value keys:keys+ '(' params:ParameterList? ')'
-    {
-      var operation = keys.pop()
-
-      if (value.keys) {
-        value.keys.concat(keys)
-      } else {
-        value.keys = keys;
-      }
-
-      return {
-        fct: function() {
-          var self = this
-          return self[operation].apply(self, arguments)
-        },
-        params: params,
-        that: value
-      };
-    }
-
-  / prot:prototype operation:operation '(' params:ParameterList? ')'
-    {
-      if (typeof prot[operation] !== 'function') {
-        throw prot.name + ' has no method ' + operation;
-      }
-      return {
-        fct: prot[operation],
-        params: params
-      };
-    }
 
 value =
   OPEN_PARENTHESE  ws Additive:Additive ws CLOSE_PARENTHESE {
@@ -171,7 +123,216 @@ value =
   {
     return new bbtCondition.ResourceValue(resource);
   }
+  / fct:fct {
+    return new bbtCondition.FunctionValue(fct)
+  }
 
+fct =
+  strfct:strfct
+  / mathfct:mathfct
+  / geofct:geofct
+
+strfct =
+  CONCAT OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: function() {
+          return String.prototype.concat.apply("", arguments)
+        },
+        params: params
+      };
+    }
+  / SUBSTRING OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      if (params.length < 2 || params.length > 3) {
+        throw 'Arguments error: substring accepts 2 or 3 arguments';
+      }
+      return {
+        fct: function(s, indexStart, indexEnd) {
+          return String.prototype.substring.apply(s, [indexStart, indexEnd])
+        },
+        params: params
+      };
+    }
+
+  / STARTSWITH OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      if (params.length != 2) {
+        throw 'Arguments error: startsWith takes exactly 2 arguments';
+      }
+      return {
+        fct: function(str, prefix) {
+          return str.startsWith(prefix)
+        },
+        params: params
+      };
+    }
+  / ENDSWITH OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      if (params.length != 2) {
+        throw 'Arguments error: endsWith takes exactly 2 arguments';
+      }
+      return {
+        fct: function(str, suffix) {
+          return str.endsWith(suffix)
+        },
+        params: params
+      };
+    }
+  / INCLUDES OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      if (params.length != 2) {
+        throw 'Arguments error: endsWith takes exactly 2 arguments';
+      }
+      return {
+        fct: function(str, lup) {
+          return str.includes(lup)
+        },
+        params: params
+      };
+    }
+
+mathfct =
+  MIN OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.min,
+        params: params
+      };
+    }
+  / MAX OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.max,
+        params: params
+      };
+    }
+
+  / MEAN OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.mean,
+        params: params
+      };
+    }
+  / RANDOM OPEN_PARENTHESE CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.random
+      };
+    }
+  / CEIL OPEN_PARENTHESE parameter:Parameter CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.ceil,
+        params: [parameter]
+      };
+    }
+  / FLOOR OPEN_PARENTHESE parameter:Parameter CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.floor,
+        params: [parameter]
+      };
+    }
+  / ABS OPEN_PARENTHESE parameter:Parameter CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.abs,
+        params: [parameter]
+      };
+    }
+  / SQRT OPEN_PARENTHESE parameter:Parameter CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.sqrt,
+        params: [parameter]
+      };
+    }
+  / POW OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.pow,
+        params: params
+      };
+    }
+  / MEDIAN OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.median,
+        params: params
+      };
+    }
+  / SUM OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.sum,
+        params: params
+      };
+    }
+  / STD OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: mathjs.std,
+        params: params
+      };
+    }
+
+geofct =
+  GETDISTANCE OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      if (params.length != 2) {
+        throw 'Arguments error: getDistance takes exactly 2 arguments';
+      }
+      return {
+        fct: Geolib.prototype.getDistance,
+        params: params
+      };
+    }
+  / ISPOINTINSIDE OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      if (params.length != 2) {
+        throw 'Arguments error: isPointInside takes exactly 2 arguments';
+      }
+      return {
+        fct: Geolib.prototype.isPointInside,
+        params: params
+      };
+    }
+  / ISPOINTINCIRCLE OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      if (params.length != 3) {
+        throw 'Arguments error: isPointInCircle takes exactly 3 arguments';
+      }
+      return {
+        fct: Geolib.prototype.isPointInCircle,
+        params: params
+      };
+    }
+  / ISPOINTINLINE OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      if (params.length != 3) {
+        throw 'Arguments error: isPointInLine takes exactly 3 arguments';
+      }
+      return {
+        fct: Geolib.prototype.isPointInLine,
+        params: params
+      };
+    }
+  / GETCENTER OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: Geolib.prototype.getCenter,
+        params: params
+      };
+    }
+  / GETPATHLENGTH OPEN_PARENTHESE params:ParameterList CLOSE_PARENTHESE
+    {
+      return {
+        fct: Geolib.prototype.getPathLength,
+        params: params
+      };
+    }
 
 resource = channel:STNAME "." resource:STNAME {
   return {
@@ -203,12 +364,6 @@ ParameterList
 
 Parameter =
   ws param:Additive ws {return param;}
-
-prototype =
-  STRING {return String.prototype;}
-  / DATE {return moment.prototype;}
-  / GEOLIB {return Geolib.prototype;}
-  / MATH {return mathjs;}
 
 constructor =
   dateconstructor:date_constructor {return dateconstructor;}
@@ -274,8 +429,8 @@ primitive
   / b:bool {return b;}
 
 bool
-  = "true" {return true;}
-  / "false" {return false;}
+  = "true"i {return true;}
+  / "false"i {return false;}
 
 OR
   = "OR"i /* case insensitive */
@@ -286,7 +441,7 @@ AND
   / "&&"
 
 NOT
-  = "NOT" /* case insensitive */
+  = "NOT"i /* case insensitive */
   / '!'
 
 OPEN_PARENTHESE = '('
@@ -299,6 +454,33 @@ GEOPOINT = "Geopoint"
 POLYGONE = "Polygone"
 MATH = "Math"
 TRIGGER = "trigger"i
+
+MIN = "min"i
+MAX = "max"i
+MEAN = "mean"i
+RANDOM = "random"i
+CEIL = "ceil"i
+FLOOR = "floor"i
+ABS = "abs"i
+SQRT = "sqrt"i
+POW = "pow"i
+MEDIAN = "median"i
+SUM = "sum"i
+STD = "std"i
+
+
+STARTSWITH = "startswith"i
+ENDSWITH = "endswith"i
+CONCAT = "concat"i
+SUBSTRING = "substring"i
+INCLUDES = "includes"i
+
+GETDISTANCE = "getdistance"i
+ISPOINTINSIDE = "ispointinside"i
+GETCENTER = "getcenter"i
+ISPOINTINCIRCLE = "ispointincircle"i
+GETPATHLENGTH = "getpathlength"i
+ISPOINTINLINE = "ispointinline"i
 
 STNAME = char:[a-zA-Z_] chars:[0-9a-zA-Z_]* { return char + chars.join(""); }
 
@@ -332,30 +514,12 @@ hexDigit
   = [0-9a-fA-F]
 
 number
-  = sign:("-" {return true})? nb:int fraction:('.' dec:int {return dec})? {
-    var value = parseFloat(nb + '.' + fraction);
-    if(sign) return -value;
-    return value;
+  = sign:("-" {return true})? unsignedvalue:(INTEGER ('.' INTEGER)? {return parseFloat(text());}) {
+    if(sign) return -unsignedvalue;
+    return unsignedvalue;
   }
 
-int
-  = nb:digit+ {return parseInt(nb.join(""));}
+INTEGER = [0-9]+ {return parseInt(text());}
 
-digit
-  = [0-9]
-
-/* ===== Whitespace ===== */
-
-nl = newline*
-newline = [\r\n]
-
-ws "space" = space*
-space = [ \t]
-
-_ "whitespace"
-  = whitespace*
-
-// Whitespace is undefined in the original JSON grammar, so I assume a simple
-// conventional definition consistent with ECMA-262, 5th ed.
-whitespace
-  = [ \t\r\n]
+ws "whitespace"
+  = [ \t\n\r]*
