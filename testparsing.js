@@ -4,8 +4,8 @@ const bbtexpr = require('./index.js')
 const bbt = require('beebotte')
 
 const client = new bbt.Connector({
-  apiKey: '502b09f9113252ba91d0fa24b2e69c1e',
-  secretKey: '88303a6fdc866caeea2fe3bf4746611d16dce93196973d77e2037887f8fc6197',
+  apiKey: 'API_KEY',
+  secretKey: 'SECRET_KEY',
   protocol: 'https'
 })
 
