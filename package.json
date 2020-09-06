@@ -1,7 +1,7 @@
 {
   "name": "bbt-expr",
   "description": "Beebotte expression processor",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "author": "Bachar Wehbi <bwehbi@beebotte.com>",
   "homepage": "https://github.com/beebotte/bbt-expr",
   "repository": {
