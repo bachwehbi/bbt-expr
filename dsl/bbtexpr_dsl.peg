@@ -72,14 +72,15 @@ AdditiveOperator
   / "-" {return types.OPERATORS.BBT_SUB}
 
 Additive
-  = left:Multiplicative  ws oper:AdditiveOperator  ws right:Additive {
-    return bbtCondition.createExpressionOrValue({
-      left: left,
-      right: right,
-      oper: oper
-    })
+  = head:Multiplicative  tail:(ws AdditiveOperator  ws Multiplicative)* {
+    return tail.reduce(function(result, element) {
+      return bbtCondition.createExpressionOrValue({
+        left: result,
+        right: element[3],
+        oper: element[1]
+      })
+    }, head)
   }
-  / Multiplicative
 
 MultiplicativeOperator
   = "*" { return types.OPERATORS.BBT_MULT }
@@ -334,12 +335,23 @@ geofct =
       };
     }
 
-resource = channel:STNAME "." resource:STNAME {
-  return {
-    channel: channel,
-    resource: resource
+resource =
+  channel:STNAME "." resource:STNAME
+    {
+      return {
+        channel: channel,
+        resource: resource,
+        iscomplex: false
+      }
     }
-  }
+  / RESOURCE OPEN_PARENTHESE channelparam:Parameter ',' resourceparam:Parameter CLOSE_PARENTHESE
+    {
+      return {
+        channel: channelparam,
+        resource: resourceparam,
+        iscomplex: true
+      }
+    }
 
 trigger = TRIGGER
 
@@ -481,6 +493,8 @@ GETCENTER = "getcenter"i
 ISPOINTINCIRCLE = "ispointincircle"i
 GETPATHLENGTH = "getpathlength"i
 ISPOINTINLINE = "ispointinline"i
+
+RESOURCE = "resource"i
 
 STNAME = char:[a-zA-Z_] chars:[0-9a-zA-Z_]* { return char + chars.join(""); }
 

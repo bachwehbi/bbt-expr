@@ -12,18 +12,22 @@
   "scripts": {
     "parse": "pegjs -o ./lib/parser.js ./dsl/bbtexpr_dsl.peg",
     "build": "browserify ./index.js --s bbtexpr -o dist/bbtexpr.js",
-    "buildmin": "uglifyjs ./dist/bbtexpr.js -m --ascii -o dist/bbtexpr.min.js"
+    "buildmin": "uglifyjs ./dist/bbtexpr.js -m --ascii -o dist/bbtexpr.min.js",
+    "test": "mocha --recursive --bail --reporter spec test 2>&1"
   },
   "dependencies": {
     "async": "2.6.1",
+    "beebotte": "^1.7.0",
+    "chai": "^4.2.0",
     "geolib": "2.0.24",
-    "moment": "2.22.2",
-    "mathjs": "5.1.0"
+    "mathjs": "5.1.0",
+    "moment": "2.22.2"
   },
   "devDependencies": {
     "browserify": "16.2.2",
     "pegjs": "0.10.0",
-    "uglify-js": "3.4.7"
+    "uglify-js": "3.4.7",
+    "mocha": "*"
   },
   "license": "MIT"
 }
